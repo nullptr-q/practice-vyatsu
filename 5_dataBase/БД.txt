@@ -1,0 +1,276 @@
+1. Тематика:  Система управления заказами для интернет-магазина.
+
+2. Создана БД OnlineShopDB
+
+3. СКРИПТ СОЗДАНИЯ ТАБЛИЦ:
+USE OnlineShopDB;
+GO
+
+-- 1. Таблица Categories (Категории товаров)
+CREATE TABLE Categories (
+    CategoryID INT PRIMARY KEY IDENTITY(1,1),
+    CategoryName NVARCHAR(100) NOT NULL, -- Строка
+    IsActive BIT NOT NULL DEFAULT 1 -- Булевый тип (активна ли категория)
+);
+
+-- 2. Таблица Products (Товары)
+CREATE TABLE Products (
+    ProductID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWSEQUENTIALID(), -- GUID
+    ProductName NVARCHAR(255) NOT NULL, -- Строка
+    Description NVARCHAR(MAX), -- Строка (длинное описание)
+    Price DECIMAL(10, 2) NOT NULL, -- Десятичное число (Цена)
+    StockQuantity INT NOT NULL DEFAULT 0,
+    CategoryID INT NOT NULL, -- Внешний ключ для связи с Categories
+    DateAdded DATETIME NOT NULL DEFAULT GETDATE(), -- Дата и время
+    IsAvailable BIT NOT NULL DEFAULT 1, -- Булевый тип (доступен ли товар)
+    -- Связь 1:N с Categories
+    CONSTRAINT FK_Product_Category FOREIGN KEY (CategoryID) REFERENCES Categories(CategoryID)
+);
+
+-- 3. Таблица Customers (Клиенты)
+CREATE TABLE Customers (
+    CustomerID INT PRIMARY KEY IDENTITY(1,1),
+    FirstName NVARCHAR(100) NOT NULL, -- Строка
+    LastName NVARCHAR(100) NOT NULL, -- Строка
+    Email NVARCHAR(255) UNIQUE NOT NULL, -- Строка (уникальный email)
+    PhoneNumber NVARCHAR(20), -- Строка
+    RegistrationDate DATETIME NOT NULL DEFAULT GETDATE(), -- Дата и время
+    IsActive BIT NOT NULL DEFAULT 1 -- Булевый тип (активен ли аккаунт)
+);
+
+-- 4. Таблица Orders (Заказы)
+CREATE TABLE Orders (
+    OrderID INT PRIMARY KEY IDENTITY(1,1),
+    CustomerID INT NOT NULL, -- Внешний ключ для связи с Customers
+    OrderDate DATETIME NOT NULL DEFAULT GETDATE(), -- Дата и время
+    TotalAmount DECIMAL(10, 2) NOT NULL, -- Десятичное число (Общая сумма заказа)
+    OrderStatus NVARCHAR(50) NOT NULL DEFAULT 'Pending', -- Строка (например, Pending, Processing, Shipped, Delivered, Cancelled)
+    IsPaid BIT NOT NULL DEFAULT 0, -- Булевый тип (оплачен ли заказ)
+    -- Связь 1:N с Customers
+    CONSTRAINT FK_Order_Customer FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
+);
+
+-- 5. Таблица OrderItems (Детали заказа) - для связи N:N между Orders и Products
+CREATE TABLE OrderItems (
+    OrderItemID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWSEQUENTIALID(), -- GUID
+    OrderID INT NOT NULL, -- Внешний ключ для связи с Orders
+    ProductID UNIQUEIDENTIFIER NOT NULL, -- Внешний ключ для связи с Products
+    Quantity INT NOT NULL,
+    UnitPrice DECIMAL(10, 2) NOT NULL, -- Десятичное число (Цена единицы на момент заказа)
+    -- Связь N:N (через эти внешние ключи)
+    CONSTRAINT FK_OrderItem_Order FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
+    CONSTRAINT FK_OrderItem_Product FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+);
+
+-- Дополнительная таблица
+-- 6. Таблица Reviews (Отзывы)
+CREATE TABLE Reviews (
+    ReviewID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWSEQUENTIALID(), -- GUID
+    ProductID UNIQUEIDENTIFIER NOT NULL, -- Связь с Products
+    CustomerID INT NOT NULL, -- Связь с Customers
+    Rating INT NOT NULL CHECK (Rating >= 1 AND Rating <= 5), -- Десятичное число (по сути, целое, но можно и DECIMAL(2,1) для 4.5)
+    Comment NVARCHAR(MAX), -- Строка
+    ReviewDate DATETIME NOT NULL DEFAULT GETDATE(), -- Дата и время
+    IsApproved BIT NOT NULL DEFAULT 0, -- Булевый тип (одобрен ли отзыв модератором)
+    CONSTRAINT FK_Review_Product FOREIGN KEY (ProductID) REFERENCES Products(ProductID),
+    CONSTRAINT FK_Review_Customer FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
+);
+
+4. В скрипте выше, связи уже созданы с помощью FOREIGN KEY ограничений:
+Связь 1:N: Categories-Products
+Customers-Orders
+Orders-OrderItems
+Customers-Reviews
+Products-Reviews
+Связаь N:N: Orders-Products
+
+5. В таблице Customers уже есть уникальное ограничение на поле Email:
+Email NVARCHAR(255) UNIQUE NOT NULL,
+
+Почему именно на этом поле индекс уместен:
+Уникальность клиента: каждый клиент должен иметь уникальный адрес эл. почты.
+Частый поиск: Поле Email часто используется для входа в систему, восстановления пароля или поиска информации о клиенте. СУБД может быстро найти нужную строку по значению Email.
+Защита от дубликатов: Индекс предотвращает вставку двух записей с одинаковым адресом.
+
+Минусы:
+При обновлении/вставке сервер должен проверять уникальность нового значения.
+Индексы занимают доп. место на диске.
+Операции удаления могут быть медленнее, т.к. нужно обновлять и индекс.
+
+6. ЭКСПОРТ И ИМПОРТ
+Экспорт (бэкап):
+Находим нужную базу данных, ПКМ по ней -> Задачи -> Создать резервную копию.
+Убеждаемся, что тип копии "Полный", выбираем путь, нажимаем "ОК", будет создан файл .bak.
+
+Экспорт(sql-дамп):
+sql BACKUP DATABASE OnlineShopDB TO DISK = 'C:\Backup\OnlineShopDB_FullBackup.bak' WITH NOFORMAT, NOINIT, NAME = 'OnlineShopDB Full Backup', STATS = 10; GO
+
+Импорт(из бэкапа):
+ПКМ по "Базы данных" -> Восстановить базу данных
+В окне выбираем "Устройство", жмем "...", находим наш файл .bak, нажимаем "OK".
+
+Импорт(sql-запрос):
+sql USE master; GO ALTER DATABASE OnlineShopDB SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+GO RESTORE DATABASE OnlineShopDB FROM DISK = 'C:\Backup\OnlineShopDB_FullBackup.bak' WITH FILE = 1,
+MOVE 'OnlineShopDB' TO 'C:\Program Files\Microsoft SQL Server\MSSQL15.SQLEXPRESS\MSSQL\DATA\OnlineShopDB.mdf', 
+MOVE 'OnlineShopDB_log' TO 'C:\Program Files\Microsoft SQL Server\MSSQL15.SQLEXPRESS\MSSQL\DATA\OnlineShopDB_Restored_log.ldf', 
+NOUNLOAD, REPLACE, STATS = 10; GO ALTER DATABASE OnlineShopDB SET MULTI_USER; GO
+
+7. Написать запросы на SQL
+1) 
+-- Выборка всех активных товаров из категории "Электроника"
+-- отсортированных по цене по убыванию
+SELECT
+    p.ProductName,
+    p.Price,
+    p.StockQuantity,
+    c.CategoryName
+FROM
+    Products AS p
+JOIN
+    Categories AS c ON p.CategoryID = c.CategoryID
+WHERE
+    c.CategoryName = 'Электроника' AND p.IsAvailable = 1
+ORDER BY
+    p.Price DESC;
+
+-- Выборка клиентов, зарегистрированных после 1 января 2023 года
+-- отсортированных по фамилии и имени
+SELECT
+    CustomerID,
+    FirstName,
+    LastName,
+    Email,
+    RegistrationDate
+FROM
+    Customers
+WHERE
+    RegistrationDate >= '2023-01-01'
+ORDER BY
+    LastName ASC, FirstName ASC;
+
+2)
+-- Изменение: Увеличить цену всех футболок на 10%.
+UPDATE Products
+SET Price = Price * 1.10
+WHERE ProductName LIKE '%Футболка%';
+
+-- Изменение: Пометить заказ Ивана на Ноутбук как оплаченный.
+UPDATE Orders
+SET IsPaid = 1, OrderStatus = 'Processing'
+WHERE CustomerID = (SELECT CustomerID FROM Customers WHERE Email = 'ivan.ivanov@example.com')
+  AND OrderStatus = 'Pending'
+  AND TotalAmount = 120000.00;
+
+-- Удаление: Удалить все неактивные категории.
+DELETE FROM Categories
+WHERE IsActive = 0;
+
+-- Удаление: Удалить все неодобренные отзывы.
+DELETE FROM Reviews
+WHERE IsApproved = 0;
+
+3)
+-- Подсчет количества товаров в каждой категории
+SELECT
+    c.CategoryName,
+    COUNT(p.ProductID) AS NumberOfProducts,
+    AVG(p.Price) AS AveragePrice
+FROM
+    Categories AS c
+LEFT JOIN
+    Products AS p ON c.CategoryID = p.CategoryID
+GROUP BY
+    c.CategoryName
+ORDER BY
+    NumberOfProducts DESC;
+
+-- Подсчет общей суммы заказов для каждого клиента
+SELECT
+    c.FirstName,
+    c.LastName,
+    COUNT(o.OrderID) AS TotalOrders,
+    SUM(o.TotalAmount) AS TotalSpent
+FROM
+    Customers AS c
+LEFT JOIN
+    Orders AS o ON c.CustomerID = o.CustomerID
+GROUP BY
+    c.FirstName, c.LastName
+HAVING
+    COUNT(o.OrderID) > 0
+ORDER BY
+    TotalSpent DESC;
+	
+4)
+-- LEFT JOIN: Все товары и их категории
+SELECT
+    p.ProductName,
+    p.Price,
+    c.CategoryName,
+    c.IsActive AS CategoryIsActive
+FROM
+    Products AS p
+LEFT JOIN
+    Categories AS c ON p.CategoryID = c.CategoryID;
+
+-- RIGHT JOIN: Все категории и связанные с ними товары
+-- Показывает все категории, даже если у них нет связанных продуктов
+SELECT
+    c.CategoryName,
+    p.ProductName
+FROM
+    Products AS p
+RIGHT JOIN
+    Categories AS c ON p.CategoryID = c.CategoryID;
+
+-- INNER JOIN: Клиенты и их заказы
+SELECT
+    c.FirstName,
+    c.LastName,
+    o.OrderID,
+    o.OrderDate,
+    o.TotalAmount,
+    o.OrderStatus
+FROM
+    Customers AS c
+INNER JOIN
+    Orders AS o ON c.CustomerID = o.CustomerID
+ORDER BY
+    c.LastName, o.OrderDate;
+
+-- Пересечение.
+SELECT ProductID FROM OrderItems
+INTERSECT
+SELECT ProductID FROM Reviews;
+
+-- Альтернатива INTERSECT через INNER JOIN для получения детальной информации
+SELECT DISTINCT
+    p.ProductName
+FROM
+    Products AS p
+INNER JOIN
+    OrderItems AS oi ON p.ProductID = oi.ProductID
+INNER JOIN
+    Reviews AS r ON p.ProductID = r.ProductID;
+
+
+-- Пример комплексного запроса:
+SELECT
+    o.OrderID,
+    c.FirstName + ' ' + c.LastName AS CustomerFullName,
+    o.OrderDate,
+    p.ProductName,
+    oi.Quantity,
+    oi.UnitPrice,
+    (oi.Quantity * oi.UnitPrice) AS LineTotal
+FROM
+    Orders AS o
+INNER JOIN
+    Customers AS c ON o.CustomerID = c.CustomerID
+INNER JOIN
+    OrderItems AS oi ON o.OrderID = oi.OrderID
+INNER JOIN
+    Products AS p ON oi.ProductID = p.ProductID
+ORDER BY
+    o.OrderID, p.ProductName;
