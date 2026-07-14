@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Учет рабочего времени</title>
+    <!-- Подключаем Tailwind CSS для стилей -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+
+    <div class="container mx-auto p-6">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Система учета рабочего времени</h1>
+            <p class="text-gray-600">Управление проектами, задачами и списанием времени</p>
+        </header>
+
+        <!-- Основная сетка -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- КОЛОНКА 1: Проекты и Задачи -->
+            <div class="space-y-6">
+                <!-- Проекты -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold mb-4 text-gray-700">Проекты</h2>
+                    <form id="projectForm" class="space-y-3 mb-4">
+                        <input type="text" id="projName" placeholder="Название проекта" class="w-full p-2 border rounded text-sm" required>
+                        <input type="text" id="projCode" placeholder="Код проекта" class="w-full p-2 border rounded text-sm" required>
+                        <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white p-2 rounded text-sm font-semibold">Добавить проект</button>
+                    </form>
+                    <div class="max-h-40 overflow-y-auto">
+                        <ul id="projectsList" class="divide-y divide-gray-200 text-sm"></ul>
+                    </div>
+                </div>
+
+                <!-- Задачи -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold mb-4 text-gray-700">Задачи</h2>
+                    <form id="taskForm" class="space-y-3 mb-4">
+                        <input type="text" id="taskName" placeholder="Название задачи" class="w-full p-2 border rounded text-sm" required>
+                        <select id="taskProjectSelect" class="w-full p-2 border rounded text-sm" required>
+                            <option value="">Выберите проект</option>
+                        </select>
+                        <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white p-2 rounded text-sm font-semibold">Добавить задачу</button>
+                    </form>
+                    <div class="max-h-40 overflow-y-auto">
+                        <ul id="tasksList" class="divide-y divide-gray-200 text-sm"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- КОЛОНКА 2: Ввод времени (Проводки) -->
+            <div class="bg-white p-6 rounded-lg shadow-md h-fit">
+                <h2 class="text-xl font-bold mb-4 text-gray-700">Внести время</h2>
+                <form id="timeEntryForm" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase">Дата</label>
+                        <input type="date" id="entryDate" class="w-full p-2 border rounded mt-1 text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase">Количество часов</label>
+                        <input type="number" step="0.5" min="0.1" max="24" id="entryHours" placeholder="Например: 8.5" class="w-full p-2 border rounded mt-1 text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase">Описание</label>
+                        <input type="text" id="entryDesc" placeholder="Что было сделано" class="w-full p-2 border rounded mt-1 text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase">Задача</label>
+                        <select id="entryTaskSelect" class="w-full p-2 border rounded mt-1 text-sm" required>
+                            <option value="">Выберите активную задачу</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded font-bold text-sm">Сохранить проводку</button>
+                </form>
+                <div id="formError" class="text-red-500 text-xs mt-3 hidden"></div>
+            </div>
+
+            <!-- КОЛОНКА 3: Календарь и Стикеры -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-2 text-gray-700">Календарь трудозатрат</h2>
+                <p class="text-xs text-gray-500 mb-4">Выберите месяц для просмотра статуса заполнения времени</p>
+                
+                <div class="flex space-x-2 mb-4">
+                    <input type="month" id="calendarMonth" class="p-2 border rounded text-sm w-full">
+                </div>
+
+                <!-- Легенда -->
+                <div class="flex justify-between text-xs mb-4 p-2 bg-gray-50 rounded">
+                    <span class="flex items-center"><span class="w-3 h-3 bg-yellow-400 rounded-full mr-1"></span> < 8ч</span>
+                    <span class="flex items-center"><span class="w-3 h-3 bg-green-500 rounded-full mr-1"></span> = 8ч</span>
+                    <span class="flex items-center"><span class="w-3 h-3 bg-red-500 rounded-full mr-1"></span> > 8ч</span>
+                </div>
+
+                <!-- Сетка дней месяца -->
+                <div id="calendarGrid" class="grid grid-cols-7 gap-2 text-center text-xs font-semibold">
+                    <!-- Заполняется динамически через JS -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Таблица всех проводок -->
+        <div class="mt-8 bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-bold mb-4 text-gray-700">История списания времени</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full table-auto text-sm">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 uppercase text-xs leading-normal">
+                            <th class="py-3 px-6 text-left">Дата</th>
+                            <th class="py-3 px-6 text-left">Задача</th>
+                            <th class="py-3 px-6 text-left">Описание</th>
+                            <th class="py-3 px-6 text-center">Часы</th>
+                            <th class="py-3 px-6 text-center">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="timeEntriesTable" class="text-gray-600 text-sm font-light">
+                        <!-- Сюда подгружаются проводки -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Клиентская логика взаимодействия с сервером -->
+    <script>
+        const API_URL = '/api';
+        const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000001'; // Используем фиксированный ID пользователя для простоты
+
+        // Установка текущего месяца и даты по умолчанию
+        const today = new Date();
+        document.getElementById('entryDate').value = today.toISOString().split('T')[0];
+        document.getElementById('calendarMonth').value = today.toISOString().slice(0, 7);
+
+        // Инициализация данных при загрузке
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProjects();
+            loadTasks();
+            loadTimeEntries();
+            loadCalendar();
+
+            // Привязка событий
+            document.getElementById('projectForm').addEventListener('submit', createProject);
+            document.getElementById('taskForm').addEventListener('submit', createTask);
+            document.getElementById('timeEntryForm').addEventListener('submit', createTimeEntry);
+            document.getElementById('calendarMonth').addEventListener('change', loadCalendar);
+        });
+
+        // Загрузка проектов
+        async function loadProjects() {
+            const res = await fetch(`${API_URL}/projects`);
+            const projects = await res.json();
+            
+            const list = document.getElementById('projectsList');
+            const select = document.getElementById('taskProjectSelect');
+            
+            list.innerHTML = '';
+            select.innerHTML = '<option value="">Выберите проект</option>';
+
+            projects.forEach(p => {
+                // В список
+                list.innerHTML += `<li class="py-2 flex justify-between items-center">
+                    <span>${p.name} <strong class="text-gray-500">[${p.code}]</strong></span>
+                    <span class="px-2 py-0.5 text-xs rounded ${p.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${p.isActive ? 'Активен' : 'Неактивен'}</span>
+                </li>`;
+                
+                // В выпадающий список создания задач
+                if (p.isActive) {
+                    select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+                }
+            });
+        }
+
+        // Загрузка задач
+        async function loadTasks() {
+            const res = await fetch(`${API_URL}/tasks`);
+            const tasks = await res.json();
+            
+            const list = document.getElementById('tasksList');
+            const select = document.getElementById('entryTaskSelect');
+            
+            list.innerHTML = '';
+            select.innerHTML = '<option value="">Выберите активную задачу</option>';
+
+            tasks.forEach(t => {
+                list.innerHTML += `<li class="py-2 flex justify-between items-center">
+                    <span>${t.name} <span class="text-xs text-gray-400">(${t.projectName})</span></span>
+                    <span class="px-2 py-0.5 text-xs rounded ${t.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${t.isActive ? 'Активна' : 'Неактивна'}</span>
+                </li>`;
+
+                if (t.isActive) {
+                    select.innerHTML += `<option value="${t.id}">${t.name} (${t.projectName})</option>`;
+                }
+            });
+        }
+
+        // Загрузка проводок времени
+        async function loadTimeEntries() {
+            const res = await fetch(`${API_URL}/timeentries?userId=${DUMMY_USER_ID}`);
+            const entries = await res.json();
+            const tbody = document.getElementById('timeEntriesTable');
+            tbody.innerHTML = '';
+
+            entries.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(e => {
+                tbody.innerHTML += `
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td class="py-3 px-6 text-left">${e.date}</td>
+                        <td class="py-3 px-6 text-left font-medium">${e.taskName}</td>
+                        <td class="py-3 px-6 text-left">${e.description}</td>
+                        <td class="py-3 px-6 text-center font-bold">${e.hours} ч.</td>
+                        <td class="py-3 px-6 text-center">
+                            <button onclick="deleteEntry('${e.id}')" class="text-red-500 hover:text-red-700 font-semibold">Удалить</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        // Загрузка календаря с цветными стикерами
+        async function loadCalendar() {
+            const monthVal = document.getElementById('calendarMonth').value;
+            if (!monthVal) return;
+
+            const [year, month] = monthVal.split('-');
+            const res = await fetch(`${API_URL}/timeentries/daily-summary?userId=${DUMMY_USER_ID}&year=${year}&month=${month}`);
+            const summaries = await res.json();
+
+            // Создаем словарь для быстрого поиска
+            const summaryMap = {};
+            summaries.forEach(s => {
+                summaryMap[s.date] = s;
+            });
+
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+
+            // Дни недели (заголовки)
+            const daysOfWeek = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+            daysOfWeek.forEach(day => {
+                grid.innerHTML += `<div class="font-bold text-gray-500 py-1">${day}</div>`;
+            });
+
+            const date = new Date(year, month - 1, 1);
+            // Корректируем начальный день недели (0 - вс, переводим в пн-вс)
+            let startDay = date.getDay() === 0 ? 6 : date.getDay() - 1;
+
+            // Пустые ячейки для выравнивания начала месяца
+            for (let i = 0; i < startDay; i++) {
+                grid.innerHTML += `<div></div>`;
+            }
+
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentStr = `${year}-${month.padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const data = summaryMap[currentStr];
+
+                let bgClass = 'bg-gray-200 text-gray-700'; // По умолчанию серый (нет списаний)
+                let hoursTooltip = '0 ч.';
+
+                if (data) {
+                    hoursTooltip = `${data.totalHours} ч.`;
+                    if (data.statusColor === 'Yellow') bgClass = 'bg-yellow-400 text-yellow-900';
+                    if (data.statusColor === 'Green') bgClass = 'bg-green-500 text-white';
+                    if (data.statusColor === 'Red') bgClass = 'bg-red-500 text-white';
+                }
+
+                grid.innerHTML += `
+                    <div class="p-2 rounded-md ${bgClass} cursor-pointer transition relative group" title="${hoursTooltip}">
+                        ${day}
+                        <span class="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full bg-black text-white text-[10px] rounded px-1 opacity-0 group-hover:opacity-100 transition z-10 pointer-events-none">
+                            ${hoursTooltip}
+                        </span>
+                    </div>`;
+            }
+        }
+
+        // Создание проекта
+        async function createProject(e) {
+            e.preventDefault();
+            const name = document.getElementById('projName').value;
+            const code = document.getElementById('projCode').value;
+
+            const res = await fetch(`${API_URL}/projects`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, code })
+            });
+
+            if (res.ok) {
+                document.getElementById('projName').value = '';
+                document.getElementById('projCode').value = '';
+                loadProjects();
+            } else {
+                alert(await res.text());
+            }
+        }
+
+        // Создание задачи
+        async function createTask(e) {
+            e.preventDefault();
+            const name = document.getElementById('taskName').value;
+            const projectId = document.getElementById('taskProjectSelect').value;
+
+            const res = await fetch(`${API_URL}/tasks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, projectId })
+            });
+
+            if (res.ok) {
+                document.getElementById('taskName').value = '';
+                document.getElementById('taskProjectSelect').value = '';
+                loadTasks();
+            } else {
+                alert(await res.text());
+            }
+        }
+
+        // Создание проводки времени
+        async function createTimeEntry(e) {
+            e.preventDefault();
+            const date = document.getElementById('entryDate').value;
+            const hours = parseFloat(document.getElementById('entryHours').value);
+            const description = document.getElementById('entryDesc').value;
+            const taskId = document.getElementById('entryTaskSelect').value;
+            const errorDiv = document.getElementById('formError');
+
+            errorDiv.classList.add('hidden');
+
+            const res = await fetch(`${API_URL}/timeentries`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date, hours, description, taskId, userId: DUMMY_USER_ID })
+            });
+
+            if (res.ok) {
+                document.getElementById('entryHours').value = '';
+                document.getElementById('entryDesc').value = '';
+                loadTimeEntries();
+                loadCalendar();
+            } else {
+                const text = await res.text();
+                errorDiv.innerText = text;
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        // Удаление проводки
+        async function deleteEntry(id) {
+            if (confirm('Удалить эту проводку времени?')) {
+                await fetch(`${API_URL}/timeentries/${id}`, { method: 'DELETE' });
+                loadTimeEntries();
+                loadCalendar();
+            }
+        }
+    </script>
+</body>
+</html>
