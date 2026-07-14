@@ -13,11 +13,23 @@ builder.Services.AddDbContext<TimeTrackingDbContext>(options =>
 builder.Services.AddScoped<TimeEntryService>();
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "API учета рабочего времени",
+        Version = "v1",
+        Description = "Сервис для регистрации трудозатрат сотрудников крупной компании"
+    });
+
+    // Настраиваем использование XML-комментариев.
+    var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+});
 
 var app = builder.Build();
 
-// Настройка Swagger для удобства останется на /swagger
+// Настройка Swagger для удобства останется на /swagger.
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
